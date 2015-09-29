@@ -126,6 +126,8 @@ class SAXTreeBuilder extends DefaultHandler {
 						
 			
 			node.add(new DefaultMutableTreeNode(name + " = " + value));
+			
+//			node.add(new DefaultMutableTreeNode("<html><h1>" + name + " </h1>= " + value));
 		}
 	}
 

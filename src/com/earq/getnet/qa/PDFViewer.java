@@ -43,7 +43,7 @@ public abstract class PDFViewer {
 	private JFrame window;
 	private XMLViewer xmlViewer;
 	public static String DEFAULT_FOLDER = "C:\\TEMP\\GetNetAmostragem\\Semana x";
-	public static int DEFAULT_TIMER_NEXT_WAIT = 5000;
+	public static int DEFAULT_TIMER_NEXT_WAIT = 3000;
 
 	Map<String, Integer> validator = new HashMap<String, Integer>();
 	Map<String, Integer> validatorInvalid = new HashMap<String, Integer>();
@@ -147,8 +147,8 @@ public abstract class PDFViewer {
 
 	public void setProperties() {
 
-		System.getProperties().put("application.viewerpreferences.hidemenubar",
-				"true");
+//		System.getProperties().put("application.viewerpreferences.hidemenubar",
+//				"true");
 
 	}
 
@@ -178,11 +178,11 @@ public abstract class PDFViewer {
 
 		properties.set(PropertiesManager.PROPERTY_DEFAULT_ZOOM_LEVEL, "3");
 
-		properties.setBoolean(
-				PropertiesManager.PROPERTY_SHOW_TOOLBAR_ANNOTATION,
-				Boolean.FALSE);
-		properties.setBoolean(PropertiesManager.PROPERTY_SHOW_TOOLBAR_FIT,
-				Boolean.FALSE);
+//		properties.setBoolean(
+//				PropertiesManager.PROPERTY_SHOW_TOOLBAR_ANNOTATION,
+//				Boolean.FALSE);
+//		properties.setBoolean(PropertiesManager.PROPERTY_SHOW_TOOLBAR_FIT,
+//				Boolean.FALSE);
 
 		SwingViewBuilder factory = new SwingViewBuilder(controller, properties);
 
@@ -285,11 +285,12 @@ public abstract class PDFViewer {
 		filePanel.add(labelFileName);
 		filePanel.add(labelBoxName);
 		// filePanel.add(labelEC);
-		filePanel.add(viewerComponentPanel);
-		filePanel.setEnabled(false);
+//		filePanel.add(viewerComponentPanel);
+//		filePanel.setEnabled(false);
 
 		window.add(filePanel);
-
+		window.add(viewerComponentPanel);
+		
 		window.pack();
 		window.setExtendedState(window.MAXIMIZED_BOTH);
 		window.setVisible(true);
