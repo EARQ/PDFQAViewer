@@ -32,7 +32,7 @@ public abstract class PDFViewer {
 	private File[] boxes;
 	private int indexFile = 0;
 	private int indexBox = 0;
-	private JLabel labelFileName;
+	private JLabel labelFileName; 
 	private JLabel labelBoxName;
 	// private JLabel labelEC;
 	private JButton button;
