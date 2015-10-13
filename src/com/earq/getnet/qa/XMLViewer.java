@@ -118,16 +118,21 @@ class SAXTreeBuilder extends DefaultHandler {
 
 	private void attachAttributeList(DefaultMutableTreeNode node,
 			Attributes atts) {
+		
+		
+		boolean next = false;
 		for (int i = 0; i < atts.getLength(); i++) {
 			
 			String name = atts.getLocalName(i);
 			String value = atts.getValue(name);
 			
-						
-			
-			node.add(new DefaultMutableTreeNode(name + " = " + value));
-			
-//			node.add(new DefaultMutableTreeNode("<html><h1>" + name + " </h1>= " + value));
+			if(next || "Código EC".equals(value) || "Número da OS".equals(value) || "EPS".equals(value)){
+				node.add(new DefaultMutableTreeNode("<html><h3>" + name + " = " + value + "</h3>"));
+				next = true;
+			}
+			else{
+				node.add(new DefaultMutableTreeNode(name + " = " + value));	
+			}
 		}
 	}
 

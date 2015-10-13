@@ -4,7 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
-import java.io.FileFilter;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -28,27 +27,31 @@ import org.icepdf.ri.util.PropertiesManager;
 
 public abstract class PDFViewer {
 
-	private File[] files;
-	private File[] boxes;
-	private int indexFile = 0;
+	private Map<String, File[]> files;
+	private Object[] boxes;
+	private File[] boxFiles;
+	private int indexFile = -1;
 	private int indexBox = 0;
-	private JLabel labelFileName; 
+	private JLabel labelFileName;
 	private JLabel labelBoxName;
-	// private JLabel labelEC;
-	private JButton button;
-	private JButton button2;
-	private JButton button3;
+	private static JLabel fileProcessing;
+	public static File currentFileProcessing;
+
+	private JButton buttonInvalido;
+	private JButton buttonValido;
+	private JButton buttonShowXML;
+	private JButton buttonStart;
 	private JFileChooser fileChooser;
 	private SwingController controller;
 	private JFrame window;
 	private XMLViewer xmlViewer;
 	public static String DEFAULT_FOLDER = "C:\\TEMP\\GetNetAmostragem\\Semana x";
-	public static int DEFAULT_TIMER_NEXT_WAIT = 3000;
+	public static int DEFAULT_TIMER_NEXT_WAIT = 1000;
 
-	Map<String, Integer> validator = new HashMap<String, Integer>();
-	Map<String, Integer> validatorInvalid = new HashMap<String, Integer>();
+	Map<Object, Integer> validator = new HashMap<Object, Integer>();
+	Map<Object, Integer> validatorInvalid = new HashMap<Object, Integer>();
 
-	public abstract boolean validateFile(File file);
+	public abstract Map<String, File[]> getSuspectFiles(File file);
 
 	public abstract void doArquivoValido(File file);
 
@@ -90,84 +93,29 @@ public abstract class PDFViewer {
 			System.out
 					.println("Lendo semana: " + fileChooser.getSelectedFile());
 
-			readWeek(fileChooser.getSelectedFile());
-		}
-
-	}
-
-	public void readWeek(File filesPath) {
-		// File filesPath = new File(filePath);
-
-		if (filesPath.isDirectory()) {
-
-			FileFilter directoryFilter = new FileFilter() {
-				public boolean accept(File file) {
-					return file.isDirectory()
-							&& file.getName().toLowerCase().contains("caixa");
-				}
-			};
-
-			boxes = filesPath.listFiles(directoryFilter);
-
-			if (boxes.length > 1) {
-				System.out.println("Lendo caixa: " + boxes[indexBox].getName());
-
-				if (boxes[indexBox].isDirectory()) {
-
-					FileFilter fileFilter = new FileFilter() {
-						public boolean accept(File file) {
-							return !file.isDirectory()
-									&& file.getName().toLowerCase()
-											.contains("pdf");
-						}
-					};
-					files = boxes[indexBox].listFiles(fileFilter);
-					readBox();
-				}
-			} else {
-				JOptionPane
-						.showMessageDialog(null, "Nenhuma caixa encontrada.");
-			}
-		}
-	}
-
-	public void readBox() {
-
-		boolean validFile = validateFile(files[indexFile]);
-
-		if (!validFile) {
-			addSuspect(boxes[indexBox]);
 			showPanel();
-		} else {
-			// showPanel();
-			nextFile(window);
 		}
-
-	}
-
-	public void setProperties() {
-
-//		System.getProperties().put("application.viewerpreferences.hidemenubar",
-//				"true");
 
 	}
 
 	public void showPanel() {
-
-		setProperties();
-
-		File file = files[indexFile];
 
 		JPanel header = new JPanel();
 
 		JLabel labelFolder = new JLabel(
 				getLabelFolder(fileChooser.getSelectedFile()));
 
-		header.add(labelFolder, BorderLayout.PAGE_START);
+		fileProcessing = new JLabel(getLabelFileProcessing());
+		
+		fileProcessing.setVisible(true);
 
-		labelFileName = new JLabel(getLabelFileName(file));
-		labelBoxName = new JLabel(getLabelBoxName(file));
+		labelFileName = new JLabel();
+		labelBoxName = new JLabel();
 		// labelEC = new JLabel(getLabelEC(file));
+
+		header.add(labelFolder, BorderLayout.NORTH);
+		header.add(labelFileName);
+		header.add(labelBoxName);
 
 		controller = new SwingController();
 
@@ -177,12 +125,6 @@ public abstract class PDFViewer {
 						.getBundle(PropertiesManager.DEFAULT_MESSAGE_BUNDLE));
 
 		properties.set(PropertiesManager.PROPERTY_DEFAULT_ZOOM_LEVEL, "3");
-
-//		properties.setBoolean(
-//				PropertiesManager.PROPERTY_SHOW_TOOLBAR_ANNOTATION,
-//				Boolean.FALSE);
-//		properties.setBoolean(PropertiesManager.PROPERTY_SHOW_TOOLBAR_FIT,
-//				Boolean.FALSE);
 
 		SwingViewBuilder factory = new SwingViewBuilder(controller, properties);
 
@@ -210,63 +152,117 @@ public abstract class PDFViewer {
 
 		JPanel buttons = new JPanel();
 
-		button = new JButton("<html><h1><font color='red'>Inválido</font></h1>");
+		buttonStart = new JButton(
+				"<html><h1><font color='green'>&nbsp;&nbsp;Iniciar Processamento&nbsp;&nbsp;</font></h1>");
 
-		// Add action listener to button1
-		button.addActionListener(new ActionListener() {
+		buttonStart.addActionListener(new ActionListener() {
 
+			@SuppressWarnings("deprecation")
 			public void actionPerformed(ActionEvent e) {
 				// Execute when button is pressed
 
-				doArquivoInvalido(files[indexFile]);
+				buttonStart.setVisible(false);
+				fileProcessing.setVisible(true);
+				window.repaint();
+				
+				
+				Timer timer = new Timer(200, new ActionListener() {
+					public void actionPerformed(ActionEvent evt) {
 
-				addInvalid(boxes[indexBox]);
+						try {
+							setFileProcessing();
 
-				nextFile(window);
+						} catch (Exception e2) {
+							e2.printStackTrace();
+						}
+					}
 
+				});
+				timer.setRepeats(true);
+
+				timer.start();
+
+				files = getSuspectFiles(fileChooser.getSelectedFile());
+
+				timer.stop();
+
+				boxes = files.keySet().toArray();
+
+				if (boxes.length == 0) {
+					JOptionPane.showMessageDialog(null,
+							"Nenhuma caixa encontrada.");
+					return;
+				}
+
+				boxFiles = files.get(boxes[indexBox]);
+
+				nextFile();
+
+				window.remove(fileProcessing);
+				window.add(viewerComponentPanel, BorderLayout.CENTER);
+				window.repaint();
+
+				viewerComponentPanel.setVisible(true);
+				buttonValido.setVisible(true);
+				buttonInvalido.setVisible(true);
+				buttonShowXML.setVisible(true);
+
+			}
+		});
+
+		buttons.add(buttonStart, BorderLayout.CENTER);
+
+		buttonInvalido = new JButton(
+				"<html><h1><font color='red'>Inválido</font></h1>");
+		buttonInvalido.setVisible(false);
+
+		buttonInvalido.addActionListener(new ActionListener() {
+
+			public void actionPerformed(ActionEvent e) {
+				doArquivoInvalido(boxFiles[indexFile]);
+				addInvalid(boxFiles[indexFile]);
+				nextFile();
 				disableButtons();
 			}
 		});
 
-		buttons.add(button, BorderLayout.CENTER);
+		buttons.add(buttonInvalido, BorderLayout.CENTER);
 
-		button2 = new JButton(
+		buttonValido = new JButton(
 				"<html><h1><font color='green'>&nbsp;&nbsp;Válido&nbsp;&nbsp;</font></h1>");
 
-		// Add action listener to button2
-		button2.addActionListener(new ActionListener() {
+		buttonValido.setVisible(false);
+
+		buttonValido.addActionListener(new ActionListener() {
 
 			public void actionPerformed(ActionEvent e) {
-				// Execute when button is pressed
-
-				doArquivoValido(files[indexFile]);
-				nextFile(window);
+				doArquivoValido(boxFiles[indexFile]);
+				nextFile();
 				disableButtons();
 
 			}
 		});
 
-		buttons.add(button2, BorderLayout.CENTER);
+		buttons.add(buttonValido, BorderLayout.CENTER);
 
-		button3 = new JButton(
+		buttonShowXML = new JButton(
 				"<html><h1><font color='blue'>&nbsp;&nbsp;&nbsp;XML&nbsp;&nbsp;&nbsp;</font></h1>");
-		// Add action listener to button2
-		button3.addActionListener(new ActionListener() {
+		buttonShowXML.setVisible(false);
+
+		buttonShowXML.addActionListener(new ActionListener() {
 
 			public void actionPerformed(ActionEvent e) {
-				// Execute when button is pressed
-
 				try {
 
 					if (xmlViewer == null) {
 						xmlViewer = new XMLViewer(window);
 					}
 
-					String fileName = files[indexFile].getName();
+					String fileName = boxFiles[indexFile].getName();
 					fileName = fileName.substring(0, fileName.lastIndexOf('.'));
 					fileName += ".xml";
 
-					xmlViewer.viewXML(files[indexFile].getParent()
+					xmlViewer.viewXML(boxFiles[indexFile].getParent()
 							+ File.separator + fileName);
 
 				} catch (Exception e1) {
@@ -276,34 +272,38 @@ public abstract class PDFViewer {
 			}
 		});
 
-		buttons.add(button3, BorderLayout.CENTER);
+		buttons.add(buttonShowXML, BorderLayout.CENTER);
 
-		window.add(buttons, BorderLayout.PAGE_END);
+		window.add(buttons, BorderLayout.SOUTH);
 
-		JPanel filePanel = new JPanel();
+//		JPanel filePanel = new JPanel();
+//
+//		// filePanel.add(labelFileName);
+//		// filePanel.add(labelBoxName);
+//		// filePanel.add(labelEC);
+//		// filePanel.add(viewerComponentPanel);
+//		// filePanel.setEnabled(false);
+//
+//		window.add(filePanel, BorderLayout.AFTER_LINE_ENDS);
 
-		filePanel.add(labelFileName);
-		filePanel.add(labelBoxName);
-		// filePanel.add(labelEC);
-//		filePanel.add(viewerComponentPanel);
-//		filePanel.setEnabled(false);
+		window.add(fileProcessing, BorderLayout.CENTER);
+		fileProcessing.setVisible(false);
 
-		window.add(filePanel);
-		window.add(viewerComponentPanel);
-		
 		window.pack();
 		window.setExtendedState(window.MAXIMIZED_BOTH);
 		window.setVisible(true);
 
-		controller.openDocument(files[indexFile].getAbsolutePath());
+		// controller.openDocument(files[indexFile].getAbsolutePath());
 		delayButtons();
 
 	}
 
+	protected void nextFile() {
+		delayButtons();
 
-
-	protected void nextFile(JFrame window) {
-		if (indexFile == files.length - 1) {
+		
+		
+		if (indexFile == boxFiles.length - 1) {
 			if (indexBox == boxes.length - 1) {
 				terminate();
 				if (window != null) {
@@ -314,44 +314,29 @@ public abstract class PDFViewer {
 				return;
 			}
 			indexFile = 0;
-			files = boxes[++indexBox].listFiles();
+			// files = boxe boxes[++indexBox].listFiles();
+
+			boxFiles = files.get(boxes[++indexBox]);
 
 		} else {
 			indexFile++;
 		}
 
-		File next = files[indexFile];
-		if (!next.getName().toLowerCase().endsWith("pdf")) {
-			nextFile(window);
+		File next = boxFiles[indexFile];
+		addSuspect(boxes[indexBox]);
+		labelFileName.setText(getLabelFileName(next));
+		labelBoxName.setText(getLabelBoxName(boxes[indexBox]));
+		// labelEC.setText(getLabelEC(next));
 
-		} else {
+		controller.openDocument(next.getAbsolutePath());
+		controller.setPageViewMode(DocumentViewControllerImpl.ONE_PAGE_VIEW,
+				true);
 
-			boolean validFile = validateFile(next);
 
-			if (!validFile) {
-				if (window == null) {
-					showPanel();
-				} else {
-					addSuspect(boxes[indexBox]);
-					labelFileName.setText(getLabelFileName(next));
-					labelBoxName.setText(getLabelBoxName(next));
-					// labelEC.setText(getLabelEC(next));
-					controller.openDocument(files[indexFile].getAbsolutePath());
-					controller.setPageViewMode(
-							DocumentViewControllerImpl.ONE_PAGE_VIEW, false);
-				}
-
-				delayButtons();
-
-			} else {
-				nextFile(window);
-			}
-
-		}
+		delayButtons();
 
 	}
-	
-	
+
 	private String getLabelFileName(File file) {
 
 		String unpadded = file.getName();
@@ -362,15 +347,25 @@ public abstract class PDFViewer {
 			padded = mask.substring(unpadded.length());
 		}
 
-		return "<html><br/><h2>Arquivo:&nbsp;<font color='blue'>"
+		return "<html><br/><h3>Arquivo:&nbsp;<font color='blue'>"
 				+ file.getName() + "</font><font color='white'>" + padded
-				+ "</font>&nbsp;&nbsp;&nbsp;</h2> ";
+				+ "</font>&nbsp;&nbsp;&nbsp;</h3> ";
 	}
 
-	private String getLabelBoxName(File file) {
-		return "<html><br/><h2>Caixa:&nbsp;<font color='blue'>"
-				+ boxes[indexBox].getName()
-				+ "</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</h2> ";
+	private String getLabelBoxName(Object caixa) {
+		return "<html><br/><h3>Caixa:&nbsp;<font color='blue'>"
+				+ caixa
+				+ "</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</h3> ";
+	}
+
+	private static String getLabelFileProcessing() {
+		
+		String fileName = "";
+	
+		
+		return "<html><br/><h1>&nbsp;&nbsp;<font color='blue'>"
+				+ "&nbsp;&nbsp;Processando Arquivos.....<br/><br/>"+"<br/><br/>&nbsp;&nbsp;&nbsp;&nbsp;"+fileName
+				+ "</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</h1> ";
 	}
 
 	// private String getLabelEC(File file) {
@@ -379,16 +374,16 @@ public abstract class PDFViewer {
 	// }
 
 	private String getLabelFolder(File file) {
-		return "<html><br/><h2>Lendo Diretório:&nbsp;&nbsp;&nbsp;&nbsp;<font color='blue'>"
-				+ file.getAbsolutePath() + "</font>&nbsp;&nbsp;&nbsp;</h2>";
+		return "<html><br/><h3>Lendo Diretório:&nbsp;&nbsp;&nbsp;&nbsp;<font color='blue'>"
+				+ file.getAbsolutePath() + "</font>&nbsp;&nbsp;&nbsp;</h3>";
 	}
 
 	private void delayButtons() {
-		
+
 		Timer timer = new Timer(DEFAULT_TIMER_NEXT_WAIT, new ActionListener() {
 			public void actionPerformed(ActionEvent evt) {
-				button.setEnabled(true);
-				button2.setEnabled(true);
+				buttonInvalido.setEnabled(true);
+				buttonValido.setEnabled(true);
 			}
 
 		});
@@ -396,22 +391,21 @@ public abstract class PDFViewer {
 
 		timer.start();
 
-		button.setEnabled(false);
-		button2.setEnabled(false);
+		buttonInvalido.setEnabled(false);
+		buttonValido.setEnabled(false);
 	}
 
 	private void disableButtons() {
-		button.setEnabled(false);
-		button2.setEnabled(false);
+		buttonInvalido.setEnabled(false);
+		buttonValido.setEnabled(false);
 		// button3.setEnabled(false);
 	}
 
-	private void addSuspect(File file) {
+	private void addSuspect(Object boxName) {
 
-		int count = validator.get(file.getName()) != null ? validator.get(file
-				.getName()) : 0;
+		int count = validator.get(boxName) != null ? validator.get(boxName) : 0;
 
-		validator.put(file.getName(), ++count);
+		validator.put(boxName, ++count);
 
 	}
 
@@ -428,10 +422,10 @@ public abstract class PDFViewer {
 
 		System.out.println("Processo terminado com sucesso.");
 
-		Iterator<String> iter = validator.keySet().iterator();
+		Iterator<Object> iter = validator.keySet().iterator();
 
 		while (iter.hasNext()) {
-			String caixa = iter.next();
+			Object caixa = iter.next();
 			System.out.println(caixa + " arquivos suspeitos: "
 					+ validator.get(caixa));
 
@@ -442,4 +436,11 @@ public abstract class PDFViewer {
 		}
 	}
 
+	public JLabel getFileProcessing() {
+		return fileProcessing;
+	}
+
+	public static void setFileProcessing() {
+		fileProcessing.setText(getLabelFileProcessing());
+	}
 }
